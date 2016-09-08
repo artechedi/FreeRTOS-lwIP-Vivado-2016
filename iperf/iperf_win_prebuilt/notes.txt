@@ -1,0 +1,3 @@
+Iperf 2.x compiled on Windows using Cygwin.
+
+https://code.google.com/p/iperf-cygwin/
