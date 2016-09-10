@@ -57,7 +57,7 @@
  *** to run it on a PEEP board
  ***/
  
-/* Start Lantiq PHY11G PHY definitions */
+/* Start Lantiq PHY11G PHY definitions added to support the RedPitaya board.*/
 
 #define PHY_LANTIQ_IDENTIFIER	0xd565
 	
@@ -300,6 +300,8 @@ unsigned get_IEEE_phy_speed(XEmacPs *xemacpsp)
 
 #else /* Zynq */
 
+/* Start Lantiq PHY11G PHY functions added to support the RedPitaya board.*/
+
 u16_t phy_mmd_read(XEmacPs *xemacpsp,u16_t phy_addr, u16_t mmd_offset, u16_t regnum, u16_t val)
 {
 	XEmacPs_PhyWrite(xemacpsp, phy_addr, MMD_CTRL, MMD_ACTYPE_ADDRESS | mmd_offset);
@@ -394,6 +396,7 @@ static u32_t get_Lantiq_phy_speed(XEmacPs *xemacpsp, u32_t phy_addr)
 
 	return XST_SUCCESS;
 }
+/* End Lantiq PHY11G PHY functions.*/
 
 unsigned get_IEEE_phy_speed(XEmacPs *xemacpsp)
 {
@@ -412,7 +415,7 @@ unsigned get_IEEE_phy_speed(XEmacPs *xemacpsp)
 #endif
 	XEmacPs_PhyRead(xemacpsp, phy_addr, PHY_IDENTIFIER_1_REG,
 					&phy_identity);
-	if (phy_identity == PHY_LANTIQ_IDENTIFIER)
+	if (phy_identity == PHY_LANTIQ_IDENTIFIER) // Detect the Lantiq PHY11G PHY included in the RedPitaya board.
 	{
 		RetStatus = get_Lantiq_phy_speed(xemacpsp, phy_addr);
 		return RetStatus;
