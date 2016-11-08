@@ -57,6 +57,13 @@
  *** to run it on a PEEP board
  ***/
  
+
+/* Start Micrel KSZ9031NRX PHY definitions added to support the Z-turn board.*/
+
+#define PHY_MIC_IDENTIFIER		0x0022
+
+/* End Micrel KSZ9031NRX PHY definitions */
+
 /* Start Lantiq PHY11G PHY definitions added to support the RedPitaya board.*/
 
 #define PHY_LANTIQ_IDENTIFIER	0xd565
@@ -194,6 +201,7 @@ static int detect_phy(XEmacPs *xemacpsp)
 {
 	u16 phy_reg;
 	u32 phy_addr;
+
 
 	for (phy_addr = 31; phy_addr > 0; phy_addr--) {
 		XEmacPs_PhyRead(xemacpsp, phy_addr, PHY_DETECT_REG,
@@ -398,6 +406,98 @@ static u32_t get_Lantiq_phy_speed(XEmacPs *xemacpsp, u32_t phy_addr)
 }
 /* End Lantiq PHY11G PHY functions.*/
 
+/* Start Micrel KSZ9031NRX PHY functions added to support the Z-turn board.*/
+
+static u32_t get_Micrel_phy_speed(XEmacPs *xemacpsp, u32_t phy_addr)
+{
+	u16_t temp;
+	u16_t control;
+	u16_t status;
+	u16_t status_speed;
+	u32_t timeout_counter = 0;
+	u32_t temp_speed;
+	u32_t phyregtemp;
+	u16_t partner_capabilities;
+
+	xil_printf("Start Micrel PHY autonegotiation  \r\n");
+
+	XEmacPs_PhyRead(xemacpsp, phy_addr, IEEE_AUTONEGO_ADVERTISE_REG, &control);  //reg 0x04
+	control |= IEEE_ASYMMETRIC_PAUSE_MASK;   //0x0800
+	control |= IEEE_PAUSE_MASK;
+	control |= ADVERTISE_100;
+	control |= ADVERTISE_10;
+	XEmacPs_PhyWrite(xemacpsp, phy_addr, IEEE_AUTONEGO_ADVERTISE_REG, control);
+
+	XEmacPs_PhyRead(xemacpsp, phy_addr, IEEE_1000_ADVERTISE_REG_OFFSET,	&control);
+	control |= ADVERTISE_1000;
+	XEmacPs_PhyWrite(xemacpsp, phy_addr, IEEE_1000_ADVERTISE_REG_OFFSET,control);
+
+	XEmacPs_PhyRead(xemacpsp, phy_addr, IEEE_COPPER_SPECIFIC_CONTROL_REG, &control);  //reg 0x0f
+	control |= (7 << 12);	
+	control |= (1 << 11);	
+	XEmacPs_PhyWrite(xemacpsp, phy_addr, IEEE_COPPER_SPECIFIC_CONTROL_REG,	control);
+
+	XEmacPs_PhyRead(xemacpsp, phy_addr, IEEE_CONTROL_REG_OFFSET, &control);          //reg 0x00
+	control |= IEEE_CTRL_AUTONEGOTIATE_ENABLE;
+	control |= IEEE_STAT_AUTONEGOTIATE_RESTART;
+	XEmacPs_PhyWrite(xemacpsp, phy_addr, IEEE_CONTROL_REG_OFFSET, control);
+
+	XEmacPs_PhyRead(xemacpsp, phy_addr, IEEE_CONTROL_REG_OFFSET, &control);
+	control |= IEEE_CTRL_RESET_MASK;
+	XEmacPs_PhyWrite(xemacpsp, phy_addr, IEEE_CONTROL_REG_OFFSET, control);
+
+	while (1) {
+		XEmacPs_PhyRead(xemacpsp, phy_addr, IEEE_CONTROL_REG_OFFSET, &control);
+		if (control & IEEE_CTRL_RESET_MASK)
+			continue;
+		else
+			break;
+	}
+
+	XEmacPs_PhyRead(xemacpsp, phy_addr, IEEE_STATUS_REG_OFFSET, &status);
+
+	xil_printf("Waiting for PHY to complete autonegotiation.\r\n");
+
+	while ( !(status & IEEE_STAT_AUTONEGOTIATE_COMPLETE) ) {
+		sleep(1);
+		XEmacPs_PhyRead(xemacpsp, phy_addr,IEEE_COPPER_SPECIFIC_STATUS_REG_2,  &temp);
+		timeout_counter++;
+		if (timeout_counter == 30) {
+			xil_printf("Auto negotiation error \r\n");
+			return;
+		}
+
+		XEmacPs_PhyRead(xemacpsp, phy_addr, IEEE_STATUS_REG_OFFSET, &status);
+	}
+	xil_printf("autonegotiation complete \r\n");
+
+#define IEEE_1000BASE_STATUS_REG 0x0a
+
+
+	/*
+	XEmacPs_PhyRead(xemacpsp, phy_addr,IEEE_1000BASE_STATUS_REG, &status_speed);
+	if (status_speed & 0x0800) {
+		xil_printf("micrel phy ksz9031 speed %x \r\n",status_speed);
+		//return 1000;
+	}
+    */
+
+	XEmacPs_PhyRead(xemacpsp, phy_addr, 0x1F, &status);
+
+	xil_printf("micrel phy ksz9031 final speed status %x \r\n",status & 0x71);
+
+	if ( (status  & 0x70) == 0x40)/* 1000Mbps */
+		return 1000;
+	else if ( (status  & 0x70) == 0x20)/* 100Mbps */
+		return 100;
+	else					/* 10Mbps */
+		return 10;
+
+	return XST_SUCCESS;
+}
+
+/* End Micrel KSZ9031NRX PHY functions */
+
 unsigned get_IEEE_phy_speed(XEmacPs *xemacpsp)
 {
 	u16 temp;
@@ -418,6 +518,11 @@ unsigned get_IEEE_phy_speed(XEmacPs *xemacpsp)
 	if (phy_identity == PHY_LANTIQ_IDENTIFIER) // Detect the Lantiq PHY11G PHY included in the RedPitaya board.
 	{
 		RetStatus = get_Lantiq_phy_speed(xemacpsp, phy_addr);
+		return RetStatus;
+	}
+	else if(phy_identity == PHY_MIC_IDENTIFIER) // Detect the Micrel KSZ9031NRX PHY included in the Z-turn board.*/
+	{
+		RetStatus = get_Micrel_phy_speed(xemacpsp, phy_addr);
 		return RetStatus;
 	}
 	else
